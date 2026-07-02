@@ -30,15 +30,40 @@ Ensure the following are installed before building:
 
 ### Local Development
 
+From the repository root, use Docker Compose to build and run the services together:
+
+```bash
+# Start all services from workspace root
+docker compose up -d --build
+```
+
+To stop and remove the containers:
+
+```bash
+docker compose down
+```
+
+> Note: this uses the root-level `docker-compose.yml` in the repository root. Run the compose commands from a shared parent dir containing both services so the service build contexts resolve correctly.
+
+You can still build and run each service manually if you prefer:
+
 ```bash
 # Clone repository
-git clone https://github.com/org/api-gateway.git
-cd api-gateway
+git clone https://github.com/misheho/distributed-system-playground.git
+cd spring-cloud-api-gateway/api-gateway
 
 # Build
 mvn clean package -DskipTests
 
 # Run
-java -jar target/api-gateway-1.0.0.jar
+java -jar target/api-gateway-0.0.1-SNAPSHOT.jar
+
+cd spring-boot-app/spb-app
+
+# Build
+mvn clean package -DskipTests
+
+# Run
+java -jar target/spb-app-0.0.1-SNAPSHOT.jar
 
 # Or via IDE (run ApiGatewayApplication.main())
