@@ -1,5 +1,4 @@
-name: Build services with docker-compose
-run: docker compose build
+name: Docker Image CI
 
 on:
   push:
@@ -15,5 +14,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - name: Build the Docker image
-      run: docker build . --file Dockerfile --tag distributed-system-playground:${{ github.sha }}
+    - name: Build services with docker-compose
+      run: docker compose -f docker-compose.yml build
+  
