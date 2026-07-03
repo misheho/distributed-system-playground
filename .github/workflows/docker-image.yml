@@ -15,5 +15,5 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Build services with docker-compose
-      run: docker-compose -f docker-compose.yml build
+      run: docker compose -f docker-compose.yml build
   
