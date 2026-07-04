@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, request
 import psycopg2
 import random
 import os
@@ -101,6 +101,34 @@ def list_all_quotes():
         
     except Exception as e:
         return {'error': str(e)}, 500
+    
+@app.route('/quote/<int:id>', methods=['PATCH'])
+def update_quote(id):
+    """Update specific quote by ID"""
+    try:
+        payload = request.get_json(silent=True)
+        if not payload or 'text' not in payload:
+            return {'error': 'Missing text field in request body'}, 400
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute('UPDATE quotes SET text = %s WHERE id = %s', (payload['text'], id))
+        conn.commit()
+
+        if cursor.rowcount == 0:
+            cursor.close()
+            conn.close()
+            return {'error': f'Quote ID {id} not found'}, 404
+
+        cursor.close()
+        conn.close()
+
+        return {'message': 'Quote updated successfully'}, 200
+
+    except Exception as e:
+        return {'error': str(e)}, 500
+    
 
 
 @app.route('/health', methods=['GET'])
