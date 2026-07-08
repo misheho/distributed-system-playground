@@ -1,0 +1,126 @@
+version: '3.8'
+
+services:
+  # ┌───────────────────────────────────────┐
+  # │ REDIS CACHE SERVICE                    │
+  # └───────────────────────────────────────┘
+  redis:
+    image: redis:7-alpine
+    container_name: gateway-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - backend-network
+    restart: unless-stopped
+  # ┌───────────────────────────────────────┐
+  # │ SPB APPLICATION SERVICE                    │
+  # └───────────────────────────────────────┘
+  spb-app:
+    build:
+      context: spring-boot-app/spb-app
+      dockerfile: Dockerfile
+    container_name: spb-application
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/spb_db
+      SPRING_DATASOURCE_USERNAME: spb_user
+      SPRING_DATASOURCE_PASSWORD: spb_user_pwd
+      SPRING_DATASOURCE_HIKARI_MAX-LIFE-TIME: 30000
+      SERVER_PORT: 8081
+      # Enable actuator for health checks
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,metrics
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - backend-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8081/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+
+  # ┌───────────────────────────────────────┐
+  # │ API GATEWAY SERVICE            │
+  # └───────────────────────────────────────┘
+  api-gateway:
+    build:
+      context: spring-cloud-api-gateway/api-gateway
+      dockerfile: Dockerfile
+    container_name: api-gateway
+    ports:
+      - "8090:8090"
+    environment:
+      SERVER_PORT: 8090
+      SPRING_PROFILES_ACTIVE: docker
+      # Redis connection (for rate limiting)
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      # Service URLs (Docker DNS resolution)
+      SPB_APP_URI: http://spb-app:8081
+      # Disable service discovery (direct URIs)
+      SPRING_CLOUD_DISCOVERY_ENABLED: false
+      EUREKA_CLIENT_ENABLED: false
+    depends_on:
+      - spb-app
+      - redis
+    networks:
+      - frontend-network
+      - backend-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8090/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+
+  # ┌───────────────────────────────────────┐
+  # │ POSTGRESQL DATABASE SERVICE            │
+  # └───────────────────────────────────────┘
+  db:
+    image: postgres:16-alpine
+    container_name: spb-db
+    environment:
+      POSTGRES_DB: spb_db
+      POSTGRES_USER: spb_user
+      POSTGRES_PASSWORD: spb_user_pwd
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - backend-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U spb_user -d spb_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+# ┌───────────────────────────────────────┐
+# │ NETWORK CONFIGURATION                  │
+# └───────────────────────────────────────┘
+networks:
+  frontend-network:
+    driver: bridge
+    # Public-facing services only (gateway)
+  backend-network:
+    driver: bridge
+    # Internal services (db, app, cache)
+
+# ┌───────────────────────────────────────┐
+# │ VOLUME CONFIGURATION                   │
+# └───────────────────────────────────────┘
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
